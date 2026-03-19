@@ -21,25 +21,25 @@ This repository accompanies the research article:
 
 
 
-sir-keystream-generator/
-│
-├── rtl/              # Verilog RTL implementation
-│   ├── sir_core.v
-│   └── sir_xor_wrapper.v
-│
-├── tb/               # Testbenches
-│   ├── tb_sir_core.v
-│   └── tb_sir_xor_wrapper.v
-│
-├── python/           # Reference model and utilities
-│   ├── sir_reference_model.py
-│   └── sir_generate_test_vectors.py
-│
-├── test_vectors/          # Deterministic test vectors
-│   ├── sir_test_vectors.csv
-│   └── sir_test_vectors.txt
-│
-└── README.md
+sir-keystream-generator
+
+Python/ # Reference model and utilities
+- sir_reference_model.py
+- sir_generate_test_vectors.py
+
+Verilog rtl/ # Verilog RTL implementation
+- sir_core.v
+- sir_xor_wrapper.v
+
+Verilog tb/ # Testbenches
+- tb_sir_core.v
+- tb_sir_xor_wrapper.v
+
+test vectors/ # Deterministic test vectors
+- sir_test_vectors.csv
+- sir_test_vectors.txt
+
+README.md
 
 
 
@@ -67,12 +67,12 @@ The Python model provides:
 
 ### Run:
 
-```
+
 
 cd python
 python sir_generate_test_vectors.py
 
-```
+
 
 ### Outputs:
 
@@ -138,15 +138,6 @@ Wayamba University of Sri Lanka
 
 ---
 
-## License
 
-This project is released for academic and research use.  
-(Add a license here if needed, e.g., MIT or BSD)
-
----
-
-## Citation
-
-If you use this work, please cite:
 
 

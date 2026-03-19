@@ -1,0 +1,123 @@
+Deterministic Test Vectors
+
+========================================================================
+TV1_all_zero
+  Key              : 00000000000000000000000000000000
+  IV               : 0000000000000000
+  Plaintext        : 00000000000000000000000000000000
+  State P (warmup) : 1835efeca92d41d9
+  State L (warmup) : 7f4a7c15b095dc97
+  Keystream        : 8452678c1e657e99cae4b96e9ce90cf8
+  Ciphertext       : 8452678c1e657e99cae4b96e9ce90cf8
+  Decrypted        : 00000000000000000000000000000000
+  PASS             : True
+========================================================================
+TV2_all_one_key
+  Key              : ffffffffffffffffffffffffffffffff
+  IV               : 0000000000000000
+  Plaintext        : 00000000000000000000000000000000
+  State P (warmup) : a37fe793febe3900
+  State L (warmup) : 80b583eab095dc97
+  Keystream        : 31f4eed43eba1871ee81ae63676a43ad
+  Ciphertext       : 31f4eed43eba1871ee81ae63676a43ad
+  Decrypted        : 00000000000000000000000000000000
+  PASS             : True
+========================================================================
+TV3_all_one_iv
+  Key              : 00000000000000000000000000000000
+  IV               : ffffffffffffffff
+  Plaintext        : 00000000000000000000000000000000
+  State P (warmup) : a37fe793febe3900
+  State L (warmup) : 80b583eab095dc97
+  Keystream        : 31f4eed43eba1871ee81ae63676a43ad
+  Ciphertext       : 31f4eed43eba1871ee81ae63676a43ad
+  Decrypted        : 00000000000000000000000000000000
+  PASS             : True
+========================================================================
+TV4_incrementing_pattern
+  Key              : 000102030405060708090a0b0c0d0e0f
+  IV               : 0001020304050607
+  Plaintext        : 000102030405060708090a0b0c0d0e0f
+  State P (warmup) : 78d86f4972820512
+  State L (warmup) : 7b4d7e1468605e38
+  Keystream        : fdb8ca10bc7622a3126e23ebccfbded9
+  Ciphertext       : fdb9c813b87324a41a6729e0c0f6d0d6
+  Decrypted        : 000102030405060708090a0b0c0d0e0f
+  PASS             : True
+========================================================================
+TV5_alternating_pattern
+  Key              : aa55aa55aa55aa55aa55aa55aa55aa55
+  IV               : 55aa55aa55aa55aa
+  Plaintext        : aa55aa55aa55aa55aa55aa55aa55aa55
+  State P (warmup) : f09e67a402bd1db6
+  State L (warmup) : 7e4b7d14ab8ec78c
+  Keystream        : e198caf82366f0be4c854fe9127bf398
+  Ciphertext       : 4bcd60ad89335aebe6d0e5bcb82e59cd
+  Decrypted        : aa55aa55aa55aa55aa55aa55aa55aa55
+  PASS             : True
+========================================================================
+TV6_reverse_pattern
+  Key              : f0e1d2c3b4a5968778695a4b3c2d1e0f
+  IV               : 8877665544332211
+  Plaintext        : 00112233445566778899aabbccddeeff
+  State P (warmup) : 5493818e8fc9b825
+  State L (warmup) : cb012639c558bea3
+  Keystream        : 8a880192b57868dee6405475a749841c
+  Ciphertext       : 8a9923a1f12d0ea96ed9fece6b946ae3
+  Decrypted        : 00112233445566778899aabbccddeeff
+  PASS             : True
+========================================================================
+TV7_seeded_random_1
+  Key              : 94d831e8f78aec5b770ca980369a38ea
+  IV               : 5bd1ff685c372c28
+  Plaintext        : b8e6fcb35cb8cb2c0d469923a590de21
+  State P (warmup) : 13f6abfd3de70acd
+  State L (warmup) : f1be1caffeebeaea
+  Keystream        : 7ae74702f0ef6e7741b1b84ea3020da2
+  Ciphertext       : c201bbb1ac57a55b4cf7216d0692d383
+  Decrypted        : b8e6fcb35cb8cb2c0d469923a590de21
+  PASS             : True
+========================================================================
+TV8_seeded_random_2
+  Key              : c362a57868df3232ad65f80e6d71d973
+  IV               : 4ff8786ae1acdd37
+  Plaintext        : 04c8fac614d6f58525f5db21162084b8
+  State P (warmup) : 2514622ffa7c2667
+  State L (warmup) : d1621f085ad20e9c
+  Keystream        : 932f428e548fee14b6c2c23fd4c5fa60
+  Ciphertext       : 97e7b84840591b919337191ec2e57ed8
+  Decrypted        : 04c8fac614d6f58525f5db21162084b8
+  PASS             : True
+========================================================================
+TV9_seeded_random_3
+  Key              : 083df8bd3117fe90f29f429184fc6528
+  IV               : 5d48df9f9940c2b6
+  Plaintext        : 1f0f4716664e9322ad99bfc2342e90a8
+  State P (warmup) : 941c1effd1bf31ec
+  State L (warmup) : c9379c51a81eedfa
+  Keystream        : 8b9db0754fcb2d2bec693687fe432195
+  Ciphertext       : 9492f7632985be0941f08945ca6db13d
+  Decrypted        : 1f0f4716664e9322ad99bfc2342e90a8
+  PASS             : True
+========================================================================
+TV10_seeded_random_4
+  Key              : 16ee67e4008417ae9818552265f61905
+  IV               : c71f271844779e2c
+  Plaintext        : 6ea6c0159dfdc48d0299010c5154c987
+  State P (warmup) : ff017b0f9bc77d80
+  State L (warmup) : 9253594959ae9819
+  Keystream        : 53a69313694de8293d38aa6c4d811fbd
+  Ciphertext       : 3d005306f4b02ca43fa1ab601cd5d63a
+  Decrypted        : 6ea6c0159dfdc48d0299010c5154c987
+  PASS             : True
+========================================================================
+TV11_long_plaintext_32B
+  Key              : 00112233445566778899aabbccddeeff
+  IV               : 0123456789abcdef
+  Plaintext        : 00112233445566778899aabbccddeefffedcba98765432100123456789abcdef
+  State P (warmup) : 9ace86d65ba40347
+  State L (warmup) : a0c00934d4ffb8e1
+  Keystream        : cbd9d3a6ced88f55f754363bb3e64d70269c345069b89f1d454a410da4a9a367
+  Ciphertext       : cbc8f1958a8de9227fcd9c807f3ba38fd8408ec81fecad0d4469046a2d026e88
+  Decrypted        : 00112233445566778899aabbccddeefffedcba98765432100123456789abcdef
+  PASS             : True
