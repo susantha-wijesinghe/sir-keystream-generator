@@ -135,7 +135,7 @@ It is **not a standardized or production-ready cipher** and should not be used f
 Dr. W. A. S. Wijesinghe  
 Department of Electronics  
 Wayamba University of Sri Lanka  
-
+susantha@wyb.ac.lk
 ---
 
 
