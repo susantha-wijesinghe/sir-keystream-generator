@@ -20,22 +20,21 @@ This repository accompanies the research article:
 ## Repository Structure
 
 
+### sir-keystream-generator
 
-sir-keystream-generator
-
-Python/ # Reference model and utilities
+**Python**
 - sir_reference_model.py
 - sir_generate_test_vectors.py
 
-Verilog rtl/ # Verilog RTL implementation
+**Verilog rtl**
 - sir_core.v
 - sir_xor_wrapper.v
 
-Verilog tb/ # Testbenches
+**Verilog tb**
 - tb_sir_core.v
 - tb_sir_xor_wrapper.v
 
-test vectors/ # Deterministic test vectors
+**test vectors**
 - sir_test_vectors.csv
 - sir_test_vectors.txt
 
