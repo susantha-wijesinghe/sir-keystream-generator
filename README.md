@@ -10,11 +10,6 @@ The SIR design explores an alternative paradigm to traditional shift-register-ba
 - compact hardware footprint  
 - reduced sequential storage requirements  
 
-This repository accompanies the research article:
-
-> **"SIR: A Sparse-Interaction Keystream Generator with a Hardware-Oriented Architecture"**  
-> Submitted to *AEU – International Journal of Electronics and Communications*
-
 ---
 
 ## Repository Structure
