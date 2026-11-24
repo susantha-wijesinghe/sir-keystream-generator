@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the article below."
+title: "SIR keystream generator"
+version: 1.0.0
+license: MIT
+repository-code: "https://github.com/susantha-wijesinghe/sir-keystream-generator"
+authors:
+  - family-names: Wijesinghe
+    given-names: "W. A. Susantha"
+    email: susantha@wyb.ac.lk
+preferred-citation:
+  type: article
+  title: "SIR: A sparse-interaction-based keystream generator for lightweight hardware applications"
+  authors:
+    - family-names: Wijesinghe
+      given-names: "W. A. Susantha"
+  journal: "Journal of King Saud University Computer and Information Sciences"
+  volume: 38
+  number: 1063
+  year: 2026
+  doi: "10.1007/s44443-026-01467-y"

@@ -1,29 +1,29 @@
-// ============================================================================
-// Title      : SIR XOR Wrapper (Stream Encryption/Decryption Interface)
-// File       : sir_xor_wrapper.v
-// Author     : Dr. W. A. Susantha Wijesinghe
-// email      : susantha@wyb.ac.lk
-// Date       : 19-03-2026
-//
-// Description:
-// ------------
-// This module provides a simple stream cipher interface using the SIR core.
-//
-// Functionality:
-//   - Instantiates the SIR keystream generator (sir_core)
-//   - XORs generated keystream with input data stream
-//   - Supports both encryption and decryption (symmetric operation)
-//
-// This wrapper enables byte-wise or word-wise processing for practical
-// testing and system integration.
-//
-// Notes:
-// ------
-// - This is a lightweight demonstration wrapper for evaluation purposes
-// - Not intended as a complete cryptographic protocol implementation
-// - Security depends on proper key/IV management (external)
-//
-// ============================================================================
+/*
+ * sir_xor_wrapper.v
+ * Byte-stream encrypt/decrypt wrapper: XORs input bytes with SIR keystream bytes.
+ *
+ * Author      : Prof. W.A. Susantha Wijesinghe
+ * Email       : susantha@wyb.ac.lk
+ * Website     : susanthawijesinghe.com
+ * Date        : 24/11/2026
+ *
+ * Copyright   : © 2026  W.A. Susantha Wijesinghe
+ * License     : MIT (see LICENSE)
+ */
+
+/*
+ * Pulse start while ready = 1 to load key/iv. Then, for each byte:
+ * present data_in with data_in_valid while data_in_ready = 1; the result
+ * appears on data_out with data_out_valid for one cycle.
+ *
+ * The core produces a keystream byte every 8 clocks and does not wait.
+ * The wrapper pairs each input byte with the next keystream byte that
+ * arrives after the input byte is accepted, so the input must be
+ * supplied within that window to keep byte i paired with keystream
+ * byte i. tb/tb_sir_xor_wrapper.v drives it this way.
+ */
+
+`timescale 1ns/1ps
 
 module sir_xor_wrapper (
     input              clk,
@@ -42,13 +42,9 @@ module sir_xor_wrapper (
     output             ready
 );
 
-    // ------------------------------------------------------------
-    // Internal connection to keystream core
-    // ------------------------------------------------------------
     wire        ks_ready;
     wire        ks_valid;
     wire [7:0]  ks_byte;
-
     reg         core_start;
 
     sir_core u_core (
@@ -64,16 +60,12 @@ module sir_xor_wrapper (
 
     assign ready = ks_ready;
 
-    // ------------------------------------------------------------
-    // Wrapper state
-    // ------------------------------------------------------------
     localparam [1:0] ST_IDLE      = 2'd0;
     localparam [1:0] ST_WAIT_DATA = 2'd1;
     localparam [1:0] ST_WAIT_KS   = 2'd2;
     localparam [1:0] ST_OUT       = 2'd3;
 
     reg [1:0] state_reg, state_next;
-
     reg [7:0] data_buf_reg, data_buf_next;
 
     reg       data_in_ready_next;
@@ -81,9 +73,6 @@ module sir_xor_wrapper (
     reg       data_out_valid_next;
     reg       core_start_next;
 
-    // ------------------------------------------------------------
-    // Next-state logic
-    // ------------------------------------------------------------
     always @(*) begin
         state_next          = state_reg;
         data_buf_next       = data_buf_reg;
@@ -93,7 +82,6 @@ module sir_xor_wrapper (
         core_start_next     = 1'b0;
 
         case (state_reg)
-
             ST_IDLE: begin
                 if (start && ks_ready) begin
                     core_start_next = 1'b1;
@@ -103,7 +91,6 @@ module sir_xor_wrapper (
 
             ST_WAIT_DATA: begin
                 data_in_ready_next = 1'b1;
-
                 if (data_in_valid) begin
                     data_buf_next = data_in;
                     state_next    = ST_WAIT_KS;
@@ -128,9 +115,6 @@ module sir_xor_wrapper (
         endcase
     end
 
-    // ------------------------------------------------------------
-    // Sequential logic
-    // ------------------------------------------------------------
     always @(posedge clk) begin
         if (rst) begin
             state_reg      <= ST_IDLE;

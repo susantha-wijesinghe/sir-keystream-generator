@@ -1,32 +1,29 @@
-// ============================================================================
-// Title      : SIR Core (Sparse-Interaction Keystream Generator)
-// File       : sir_core.v
-// Author     : Dr. W. A. Susantha Wijesinghe
-// email      : susantha@wyb.ac.lk
-// Date       : 19-03-2026
-//
-// Description:
-// ------------
-// This module implements the core keystream generation logic of the
-// SIR (Sparse Interaction Register) architecture.
-//
-// The design consists of:
-//   - A 64-bit nonlinear primary state updated via sparse local interaction
-//   - A 64-bit auxiliary LFSR providing round-dependent perturbation
-//
-// The primary state evolves through a uniform Boolean update rule applied
-// across a sparsely connected neighbourhood, enabling parallel combinational
-// mixing instead of sequential propagation.
-//
-// This module produces one keystream bit per clock cycle after initialization.
-//
-// Notes:
-// ------
-// - Designed for lightweight hardware implementation (FPGA/ASIC)
-// - Intended for research and evaluation purposes
-// - Reference Python model available in sir_reference_model.py
-//
-// ============================================================================
+/*
+ * sir_core.v
+ * SIR keystream generator core: key/IV load, 32-round warm-up, one keystream bit per clock.
+ *
+ * Author      : Prof. W.A. Susantha Wijesinghe
+ * Email       : susantha@wyb.ac.lk
+ * Website     : susanthawijesinghe.com
+ * Date        : 24/11/2026
+ *
+ * Copyright   : © 2026  W.A. Susantha Wijesinghe
+ * License     : MIT (see LICENSE)
+ */
+
+/*
+ * Interface
+ *   start   : one-cycle pulse while ready = 1 loads key/iv and starts warm-up
+ *   ks_byte : keystream byte, valid for one cycle when valid = 1
+ *             (first keystream bit in ks_byte[7])
+ *
+ * Bit numbering
+ *   The model (model/sir.py) numbers state bits 0..63 with bit 0 first.
+ *   In this RTL, model index i is vector bit [63 - i]; get_bit_idx() does
+ *   the mapping so the update equations read the same as in the model.
+ */
+
+`timescale 1ns/1ps
 
 module sir_core (
     input              clk,
@@ -39,19 +36,23 @@ module sir_core (
     output reg [7:0]   ks_byte
 );
 
+    localparam integer LONG_OFFSET   = 16;  // neighbourhood: P[i-1], P[i+1], P[i+16]
+    localparam integer COUPLING      = 12;  // extra XOR term P[i+12]
+    localparam integer TAP0          = 0;   // output function taps
+    localparam integer TAP1          = 13;
+    localparam integer TAP2          = 29;
+    localparam integer TAP3          = 46;
+    localparam integer WARMUP_ROUNDS = 32;
+    localparam [63:0]  INIT_CONST    = 64'h9E3779B97F4A7C15;
+
     localparam [1:0] ST_IDLE   = 2'd0;
     localparam [1:0] ST_LOAD   = 2'd1;
     localparam [1:0] ST_WARMUP = 2'd2;
     localparam [1:0] ST_RUN    = 2'd3;
 
-    localparam [63:0] INIT_CONST = 64'h9E3779B97F4A7C15;
-    localparam integer WARMUP_ROUNDS = 32;
-
     reg [1:0]  state_reg, state_next;
-
     reg [63:0] P_reg, P_next;
     reg [63:0] L_reg, L_next;
-
     reg [5:0]  warmup_ctr_reg, warmup_ctr_next;
     reg [2:0]  bit_ctr_reg, bit_ctr_next;
     reg [7:0]  ks_byte_reg, ks_byte_next;
@@ -68,9 +69,6 @@ module sir_core (
 
     integer i;
 
-    // ------------------------------------------------------------
-    // Rule-A
-    // ------------------------------------------------------------
     function rule_a;
         input x0;
         input x1;
@@ -81,9 +79,6 @@ module sir_core (
         end
     endfunction
 
-    // ------------------------------------------------------------
-    // Rotate-left-by-1 for MSB-first 64-bit vector
-    // ------------------------------------------------------------
     function [63:0] rotl1_64;
         input [63:0] x;
         begin
@@ -91,10 +86,7 @@ module sir_core (
         end
     endfunction
 
-    // ------------------------------------------------------------
-    // Map Python-style bit index idx in [0..63]
-    // to RTL vector bit position [63-idx]
-    // ------------------------------------------------------------
+    // Model bit index idx -> vector bit [63 - idx]
     function get_bit_idx;
         input [63:0] x;
         input integer idx;
@@ -103,19 +95,20 @@ module sir_core (
         end
     endfunction
 
-    // ------------------------------------------------------------
-    // Output function using Python-style tap indices:
-    // taps = {0,16,32,48} -> RTL positions {63,47,31,15}
-    // ------------------------------------------------------------
+    // z = RULEA(P[TAP0..TAP3]) XOR parity of the other 60 bits
     function output_func;
         input [63:0] P;
+        integer k;
         reg parity_rest;
         begin
-            parity_rest =
-                ^{P[62:48], P[46:32], P[30:16], P[14:0]};
-
-            output_func =
-                rule_a(P[63], P[47], P[31], P[15]) ^ parity_rest;
+            parity_rest = 1'b0;
+            for (k = 0; k < 64; k = k + 1) begin
+                if (k != TAP0 && k != TAP1 && k != TAP2 && k != TAP3)
+                    parity_rest = parity_rest ^ get_bit_idx(P, k);
+            end
+            output_func = rule_a(get_bit_idx(P, TAP0), get_bit_idx(P, TAP1),
+                                 get_bit_idx(P, TAP2), get_bit_idx(P, TAP3))
+                          ^ parity_rest;
         end
     endfunction
 
@@ -123,27 +116,20 @@ module sir_core (
     // Round datapath
     // ------------------------------------------------------------
     always @(*) begin
-        // Primary-state update
-        // For Python index i:
-        //   P'_i = RuleA(P_i, P_{i-1}, P_{i+1}, P_{i+8}) XOR P_{i+2}
+        // P'[i] = RULEA(P[i], P[i-1], P[i+1], P[i+16]) XOR P[i+12]
         for (i = 0; i < 64; i = i + 1) begin
             P_round_raw[63 - i] =
-                rule_a(
-                    get_bit_idx(P_reg, i),
-                    get_bit_idx(P_reg, (i + 63) % 64),
-                    get_bit_idx(P_reg, (i + 1)  % 64),
-                    get_bit_idx(P_reg, (i + 8)  % 64)
-                ) ^
-                get_bit_idx(P_reg, (i + 2) % 64);
+                rule_a(get_bit_idx(P_reg, i),
+                       get_bit_idx(P_reg, (i + 63) % 64),
+                       get_bit_idx(P_reg, (i + 1) % 64),
+                       get_bit_idx(P_reg, (i + LONG_OFFSET) % 64))
+                ^ get_bit_idx(P_reg, (i + COUPLING) % 64);
         end
 
-        L_round = {
-            L_reg[62:0],
-            (L_reg[63] ^ L_reg[62] ^ L_reg[60] ^ L_reg[59])
-        };
+        // LFSR, taps L[0], L[1], L[3], L[4]
+        L_round = {L_reg[62:0], (L_reg[63] ^ L_reg[62] ^ L_reg[60] ^ L_reg[59])};
 
-        // Round-key extraction from Python indices
-        // [0,8,16,24,32,40,48,56] -> RTL [63,55,47,39,31,23,15,7]
+        // Round key L[0], L[8], ..., L[56] of the updated LFSR
         rk_round[0] = L_round[63];
         rk_round[1] = L_round[55];
         rk_round[2] = L_round[47];
@@ -153,47 +139,34 @@ module sir_core (
         rk_round[6] = L_round[15];
         rk_round[7] = L_round[7];
 
-        // Inject into Python P[0..7] -> RTL [63:56]
-        P_round_inj = P_round_raw;
-        P_round_inj[63] = P_round_raw[63] ^ rk_round[0];
-        P_round_inj[62] = P_round_raw[62] ^ rk_round[1];
-        P_round_inj[61] = P_round_raw[61] ^ rk_round[2];
-        P_round_inj[60] = P_round_raw[60] ^ rk_round[3];
-        P_round_inj[59] = P_round_raw[59] ^ rk_round[4];
-        P_round_inj[58] = P_round_raw[58] ^ rk_round[5];
-        P_round_inj[57] = P_round_raw[57] ^ rk_round[6];
-        P_round_inj[56] = P_round_raw[56] ^ rk_round[7];
+        // Injected into P[0..7]
+        P_round_inj        = P_round_raw;
+        P_round_inj[63:56] = P_round_raw[63:56] ^ {rk_round[0], rk_round[1], rk_round[2], rk_round[3],
+                                                   rk_round[4], rk_round[5], rk_round[6], rk_round[7]};
 
-        // Output bit from updated + injected primary state
         z_bit = output_func(P_round_inj);
     end
 
     // ------------------------------------------------------------
-    // Control / next-state logic
+    // Control
     // ------------------------------------------------------------
     always @(*) begin
         state_next       = state_reg;
-
         P_next           = P_reg;
         L_next           = L_reg;
-
         warmup_ctr_next  = warmup_ctr_reg;
         bit_ctr_next     = bit_ctr_reg;
         ks_byte_next     = ks_byte_reg;
-
         ready_next       = 1'b0;
         valid_next       = 1'b0;
         ks_byte_out_next = ks_byte;
 
         case (state_reg)
-
             ST_IDLE: begin
-                ready_next       = 1'b1;
-                valid_next       = 1'b0;
-                bit_ctr_next     = 3'd0;
-                ks_byte_next     = 8'd0;
-                warmup_ctr_next  = 6'd0;
-
+                ready_next      = 1'b1;
+                bit_ctr_next    = 3'd0;
+                ks_byte_next    = 8'd0;
+                warmup_ctr_next = 6'd0;
                 if (start) begin
                     state_next = ST_LOAD;
                     ready_next = 1'b0;
@@ -201,12 +174,7 @@ module sir_core (
             end
 
             ST_LOAD: begin
-                // Initialization:
-                // P0 = K0 XOR V
-                // L0 = K1 XOR RotL1(V) XOR C
-                //
-                // key[127:64] = K0
-                // key[63:0]   = K1
+                // P = K0 ^ IV,  L = K1 ^ RotL1(IV) ^ C,  with K0 = key[127:64], K1 = key[63:0]
                 P_next          = key[127:64] ^ iv;
                 L_next          = key[63:0] ^ rotl1_64(iv) ^ INIT_CONST;
                 warmup_ctr_next = 6'd0;
@@ -218,11 +186,8 @@ module sir_core (
             ST_WARMUP: begin
                 P_next = P_round_inj;
                 L_next = L_round;
-
-                if (warmup_ctr_reg == (WARMUP_ROUNDS - 1)) begin
+                if (warmup_ctr_reg == WARMUP_ROUNDS - 1) begin
                     warmup_ctr_next = 6'd0;
-                    bit_ctr_next    = 3'd0;
-                    ks_byte_next    = 8'd0;
                     state_next      = ST_RUN;
                 end else begin
                     warmup_ctr_next = warmup_ctr_reg + 6'd1;
@@ -233,10 +198,7 @@ module sir_core (
                 P_next = P_round_inj;
                 L_next = L_round;
 
-                // Assemble byte MSB-first:
-                // first produced bit -> ks_byte[7]
-                // ...
-                // eighth produced bit -> ks_byte[0]
+                // Collect bits MSB first; emit the byte after the 8th bit
                 ks_byte_next = ks_byte_reg;
                 ks_byte_next[7 - bit_ctr_reg] = z_bit;
 
@@ -245,7 +207,7 @@ module sir_core (
                     valid_next       = 1'b1;
                     ks_byte_out_next = ks_byte_next;
                 end else begin
-                    bit_ctr_next     = bit_ctr_reg + 3'd1;
+                    bit_ctr_next = bit_ctr_reg + 3'd1;
                 end
             end
 
@@ -256,9 +218,6 @@ module sir_core (
         endcase
     end
 
-    // ------------------------------------------------------------
-    // Sequential registers
-    // ------------------------------------------------------------
     always @(posedge clk) begin
         if (rst) begin
             state_reg      <= ST_IDLE;
