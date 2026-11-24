@@ -21,8 +21,14 @@ holds 216 bytes, one per line: key (16), iv (8), keystream (64),
 plaintext (64), ciphertext (64).
 
 Run from the repository root:  python3 model/gen_kat.py
+
+With --random N, writes only a .mem file of N random key/IV vectors
+(same record layout) to the path given by --mem. make sim uses this for
+the random-vector RTL test:
+    python3 model/gen_kat.py --random 100 --seed 1 --mem build/random.mem
 """
 
+import argparse
 import random
 import sys
 from pathlib import Path
@@ -55,7 +61,40 @@ def plaintext(index: int) -> bytes:
     return bytes((0x11 * j + 7 * index) & 0xFF for j in range(NBYTES))
 
 
+def mem_lines(idx: int, name: str, key: bytes, iv: bytes):
+    ks = SIR(key, iv).keystream(NBYTES)
+    pt = plaintext(idx)
+    ct = bytes(a ^ b for a, b in zip(pt, ks))
+    lines = [f"// vector {idx} ({name}): key, iv, keystream, plaintext, ciphertext"]
+    for data in (key, iv, ks, pt, ct):
+        lines.extend(f"{b:02x}" for b in data)
+    return ks, pt, ct, lines
+
+
+def write_random(count: int, seed: int, path: Path) -> int:
+    rnd = random.Random(seed)
+    mem = []
+    for idx in range(1, count + 1):
+        key = bytes(rnd.getrandbits(8) for _ in range(16))
+        iv = bytes(rnd.getrandbits(8) for _ in range(8))
+        mem.extend(mem_lines(idx, f"random seed {seed}", key, iv)[3])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(mem) + "\n")
+    print(f"wrote {count} random vectors (seed {seed}) to {path}")
+    return 0
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--random", type=int, help="number of random vectors")
+    ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--mem", type=Path, help="output .mem path for --random")
+    args = ap.parse_args()
+    if args.random is not None:
+        if args.mem is None:
+            ap.error("--random needs --mem")
+        return write_random(args.random, args.seed, args.mem)
+
     OUT_DIR.mkdir(exist_ok=True)
     txt, csv, mem = [], ["index,name,key,iv,keystream,plaintext,ciphertext"], []
 
@@ -66,9 +105,7 @@ def main() -> int:
     txt.append("# Ciphertext = plaintext XOR keystream.")
 
     for idx, (name, key, iv) in enumerate(vectors(), start=1):
-        ks = SIR(key, iv).keystream(NBYTES)
-        pt = plaintext(idx)
-        ct = bytes(a ^ b for a, b in zip(pt, ks))
+        ks, pt, ct, lines = mem_lines(idx, name, key, iv)
 
         txt.append("")
         txt.append(f"Vector     : {idx} ({name})")
@@ -81,9 +118,7 @@ def main() -> int:
 
         csv.append(",".join([str(idx), name, key.hex(), iv.hex(), ks.hex(), pt.hex(), ct.hex()]))
 
-        mem.append(f"// vector {idx} ({name}): key, iv, keystream, plaintext, ciphertext")
-        for data in (key, iv, ks, pt, ct):
-            mem.extend(f"{b:02x}" for b in data)
+        mem.extend(lines)
 
     (OUT_DIR / "sir_kat.txt").write_text("\n".join(txt) + "\n")
     (OUT_DIR / "sir_kat.csv").write_text("\n".join(csv) + "\n")

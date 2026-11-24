@@ -15,14 +15,15 @@
  * Run from the repository root (the KAT path is relative):
  *   iverilog -g2005 -o build/tb_sir_core.vvp rtl/sir_core.v tb/tb_sir_core.v
  *   vvp build/tb_sir_core.vvp
- * Another KAT file can be given with +kat=<path>.
+ * Another vector file can be given with +kat=<path> and its vector count
+ * with +nv=<n> (up to MAX_NV); make sim uses this for 100 random vectors.
  */
 
 `timescale 1ns/1ps
 
 module tb_sir_core;
 
-    localparam integer NV  = 8;           // vectors in the KAT file
+    localparam integer MAX_NV = 256;      // largest vector file accepted
     localparam integer NB  = 64;          // keystream bytes per vector
     localparam integer REC = 24 + 3 * NB; // bytes per vector in the file
 
@@ -36,10 +37,10 @@ module tb_sir_core;
     wire        valid;
     wire [7:0]  ks_byte;
 
-    reg [7:0]   kat [0:NV*REC-1];
+    reg [7:0]   kat [0:MAX_NV*REC-1];
     reg [8*256-1:0] kat_file;
 
-    integer v, j, base;
+    integer v, j, base, nv;
     integer total, passed;
 
     sir_core dut (
@@ -73,18 +74,25 @@ module tb_sir_core;
     initial begin
         if (!$value$plusargs("kat=%s", kat_file))
             kat_file = "kat/sir_kat.mem";
-        $readmemh(kat_file, kat);
+        if (!$value$plusargs("nv=%d", nv))
+            nv = 8;
+        if (nv < 1 || nv > MAX_NV) begin
+            $display("nv must be 1..%0d", MAX_NV);
+            $finish;
+        end
+        $readmemh(kat_file, kat, 0, nv * REC - 1);
 
         total  = 0;
         passed = 0;
 
-        for (v = 0; v < NV; v = v + 1) begin
+        for (v = 0; v < nv; v = v + 1) begin
             base = v * REC;
             apply_reset();
 
             for (j = 0; j < 16; j = j + 1) key[127 - 8*j -: 8] = kat[base + j];
             for (j = 0; j < 8;  j = j + 1) iv[63 - 8*j -: 8]   = kat[base + 16 + j];
-            $display("vector %0d  key=%032x  iv=%016x", v + 1, key, iv);
+            if (nv <= 8)
+                $display("vector %0d  key=%032x  iv=%016x", v + 1, key, iv);
 
             while (ready !== 1'b1) @(posedge clk);
             start <= 1'b1;
@@ -102,8 +110,9 @@ module tb_sir_core;
             end
         end
 
-        $display("tb_sir_core: %0d / %0d keystream bytes match", passed, total);
-        $display("OVERALL RESULT: %s", (passed == total && total == NV * NB) ? "PASS" : "FAIL");
+        $display("tb_sir_core: %0d vectors, %0d / %0d keystream bytes match (%0s)",
+                 nv, passed, total, kat_file);
+        $display("OVERALL RESULT: %s", (passed == total && total == nv * NB) ? "PASS" : "FAIL");
         $finish;
     end
 

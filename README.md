@@ -89,10 +89,14 @@ cc -O2 -o build/sir model/sir.c
 Both print the keystream in hex. For this key and IV the first 16 bytes are
 `4fde30b24fdf8ee4e83c23f60497d4c4`.
 
-The core outputs a keystream byte every 8 clocks and does not stall. The
-XOR wrapper pairs each input byte with the next keystream byte, so input
-bytes must arrive at least once every 8 clocks. If they arrive slower,
-keystream bytes are skipped. The wrapper testbench feeds it at that rate.
+The core outputs a keystream byte every 8 clocks and has no way to pause.
+The XOR wrapper pairs each input byte with the next keystream byte, so input
+bytes must arrive at least once every 8 clocks. If an input byte is late, a
+keystream byte is lost and every later output is wrong. The wrapper then sets
+its `ks_dropped` output high, and it stays high until reset. Outputs produced
+while `ks_dropped` is low are correct. The wrapper testbench checks this with
+back-to-back input, one byte every 8 clocks, and random gaps of 0 to 40
+clocks.
 
 ## Results
 

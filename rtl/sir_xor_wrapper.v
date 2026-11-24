@@ -16,11 +16,12 @@
  * present data_in with data_in_valid while data_in_ready = 1; the result
  * appears on data_out with data_out_valid for one cycle.
  *
- * The core produces a keystream byte every 8 clocks and does not wait.
- * The wrapper pairs each input byte with the next keystream byte that
- * arrives after the input byte is accepted, so the input must be
- * supplied within that window to keep byte i paired with keystream
- * byte i. tb/tb_sir_xor_wrapper.v drives it this way.
+ * The core produces a keystream byte every 8 clocks and cannot be paused.
+ * Each input byte is XORed with the next keystream byte that arrives after
+ * the input byte is accepted. A keystream byte that arrives while no input
+ * byte is waiting for it is lost, and every later output is then XORed with
+ * the wrong keystream byte. ks_dropped goes high when that happens and stays
+ * high until reset. Outputs produced while ks_dropped is low are correct.
  */
 
 `timescale 1ns/1ps
@@ -39,7 +40,8 @@ module sir_xor_wrapper (
     output reg [7:0]   data_out,
     output reg         data_out_valid,
 
-    output             ready
+    output             ready,
+    output reg         ks_dropped
 );
 
     wire        ks_ready;
@@ -72,6 +74,7 @@ module sir_xor_wrapper (
     reg [7:0] data_out_next;
     reg       data_out_valid_next;
     reg       core_start_next;
+    reg       ks_dropped_next;
 
     always @(*) begin
         state_next          = state_reg;
@@ -80,11 +83,17 @@ module sir_xor_wrapper (
         data_out_next       = data_out;
         data_out_valid_next = 1'b0;
         core_start_next     = 1'b0;
+        ks_dropped_next     = ks_dropped;
+
+        // Keystream byte with no input byte waiting for it
+        if (ks_valid && state_reg != ST_WAIT_KS && state_reg != ST_IDLE)
+            ks_dropped_next = 1'b1;
 
         case (state_reg)
             ST_IDLE: begin
                 if (start && ks_ready) begin
                     core_start_next = 1'b1;
+                    ks_dropped_next = 1'b0;
                     state_next      = ST_WAIT_DATA;
                 end
             end
@@ -123,6 +132,7 @@ module sir_xor_wrapper (
             data_out       <= 8'd0;
             data_out_valid <= 1'b0;
             core_start     <= 1'b0;
+            ks_dropped     <= 1'b0;
         end else begin
             state_reg      <= state_next;
             data_buf_reg   <= data_buf_next;
@@ -130,6 +140,7 @@ module sir_xor_wrapper (
             data_out       <= data_out_next;
             data_out_valid <= data_out_valid_next;
             core_start     <= core_start_next;
+            ks_dropped     <= ks_dropped_next;
         end
     end
 

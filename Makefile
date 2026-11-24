@@ -14,7 +14,8 @@
 #   make          run everything (check + sim)
 #   make kat      regenerate kat/ from model/sir.py
 #   make check    compare Python model, C model and kat/
-#   make sim      run both testbenches with Icarus Verilog
+#   make sim      run the testbenches with Icarus Verilog
+#                 (core on kat/, core on 100 random vectors, XOR wrapper)
 #   make clean    remove build/
 
 PYTHON   ?= python3
@@ -24,8 +25,10 @@ IVERILOG ?= iverilog
 VVP      ?= vvp
 
 BUILD := build
+RANDOM_N    ?= 100
+RANDOM_SEED ?= 1
 
-.PHONY: all kat check sim sim-core sim-wrapper clean
+.PHONY: all kat check sim sim-core sim-random sim-wrapper clean
 
 all: check sim
 
@@ -41,11 +44,18 @@ kat:
 check: $(BUILD)/sir
 	$(PYTHON) model/check_models.py $(BUILD)/sir
 
-sim: sim-core sim-wrapper
+sim: sim-core sim-random sim-wrapper
 
-sim-core: | $(BUILD)
-	$(IVERILOG) -g2005 -Wall -o $(BUILD)/tb_sir_core.vvp rtl/sir_core.v tb/tb_sir_core.v
+$(BUILD)/tb_sir_core.vvp: rtl/sir_core.v tb/tb_sir_core.v | $(BUILD)
+	$(IVERILOG) -g2005 -Wall -o $@ rtl/sir_core.v tb/tb_sir_core.v
+
+sim-core: $(BUILD)/tb_sir_core.vvp
 	$(VVP) -n $(BUILD)/tb_sir_core.vvp
+
+# Core against model/sir.py on RANDOM_N random key/IV pairs, 64 bytes each
+sim-random: $(BUILD)/tb_sir_core.vvp
+	$(PYTHON) model/gen_kat.py --random $(RANDOM_N) --seed $(RANDOM_SEED) --mem $(BUILD)/random.mem
+	$(VVP) -n $(BUILD)/tb_sir_core.vvp +kat=$(BUILD)/random.mem +nv=$(RANDOM_N)
 
 sim-wrapper: | $(BUILD)
 	$(IVERILOG) -g2005 -Wall -o $(BUILD)/tb_sir_xor_wrapper.vvp \
